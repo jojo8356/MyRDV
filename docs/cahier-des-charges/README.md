@@ -55,6 +55,9 @@ Il poursuit trois objectifs :
 | [`tools/recurrence_simulator.py`](tools/recurrence_simulator.py) | **Spécification exécutable** du moteur de récurrence (Python 3.9+, sans dépendance) |
 | [`schemas/recurrence-rule.schema.json`](schemas/recurrence-rule.schema.json) | Schéma JSON (Draft 2020-12) de validation d'une règle de récurrence |
 | [`tools/test_schemas.py`](tools/test_schemas.py) | 17 cas de validation du schéma JSON |
+| [`tools/build_pdf.py`](tools/build_pdf.py) | Compilation du dossier en PDF (thème GitHub Light + startup) |
+| [`tools/fetch_fonts.py`](tools/fetch_fonts.py) | Récupération des polices Inter / JetBrains Mono |
+| `pdf/` (racine du dépôt) | PDF générés : dossier complet (100 p.) et extrait récurrence (33 p.) |
 
 ## 3. Comment lire ce dossier
 
@@ -95,7 +98,15 @@ python3 tools/recurrence_simulator.py --self-test   # 400 séries, 6 invariants
 python3 tools/recurrence_simulator.py --demo        # « 1 fois/semaine pendant 3 mois » = 14 séances
 python3 tools/recurrence_simulator.py --vectors > annexes/vecteurs-test-recurrence.json
 pip install jsonschema && python3 tools/test_schemas.py
+
+# PDF : polices puis compilation
+pip install reportlab markdown fonttools brotli
+python3 tools/fetch_fonts.py
+python3 tools/build_pdf.py            # -> ../../pdf/*.pdf
 ```
+
+> Les PDF sont versionnés à la racine (`pdf/`) ; les polices ne le sont pas (`.fonts/`,
+> récupérées par `tools/fetch_fonts.py`).
 
 ---
 

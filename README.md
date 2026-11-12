@@ -16,6 +16,22 @@ Points d'entrée :
 - [`docs/06-moteur-rdv-recurrents.md`](docs/cahier-des-charges/docs/06-moteur-rdv-recurrents.md) — spécification normative des rendez-vous récurrents
 - [`docs/01-contexte-analyse-marche.md`](docs/cahier-des-charges/docs/01-contexte-analyse-marche.md) — analyse fonctionnelle de GOrendezvous
 
+## Documents PDF
+
+| Fichier | Contenu |
+|---|---|
+| [`pdf/MyRDV-cahier-des-charges-complet-v1.0.pdf`](pdf/MyRDV-cahier-des-charges-complet-v1.0.pdf) | Dossier complet (11 documents + 2 annexes, 100 pages) |
+| [`pdf/MyRDV-moteur-rdv-recurrents-v1.0.pdf`](pdf/MyRDV-moteur-rdv-recurrents-v1.0.pdf) | Extrait normatif : moteur de rendez-vous récurrents + API (33 pages) |
+
+Thème GitHub Light avec accent indigo, sommaire cliquable, signets PDF, en-têtes/pieds paginés.
+Regénération :
+
+```bash
+cd docs/cahier-des-charges
+python3 tools/fetch_fonts.py     # polices Inter / JetBrains Mono (non versionnées)
+python3 tools/build_pdf.py       # -> pdf/*.pdf
+```
+
 ## Spécification exécutable du module de récurrence
 
 ```bash
