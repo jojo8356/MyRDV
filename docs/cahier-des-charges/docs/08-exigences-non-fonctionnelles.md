@@ -118,7 +118,7 @@ Voir [document 04](04-securite-conformite.md). Exigences mesurables :
 | NFR-OBS-07 | Synthétique : parcours de réservation testé toutes les 5 min depuis 3 régions |
 | NFR-OBS-08 | Métrique dédiée `series_generation_discrepancy_total` comparant simulateur et production (R-17) |
 
-**Sondes de santé** : `/health/live`, `/health/ready`, `/health/deep` (base, Redis, NATS, Stripe).
+**Sondes de santé** : `/health/live`, `/health/ready`, `/health/deep` (base, Redis, files BullMQ, Stripe).
 
 ---
 

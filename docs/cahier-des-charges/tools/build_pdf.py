@@ -202,10 +202,16 @@ CALL_OUT = {
 
 
 def code_chip(text: str) -> str:
-    """`code` -> pastille grise (github-markdown-css)."""
+    """`code` -> pastille grise (github-markdown-css).
+
+    Au-delà de 24 caractères, la pastille n'est plus encadrée d'espaces
+    insécables : dans une cellule étroite, ces espaces empêchent reportlab de
+    replier le jeton, qui déborde alors de la colonne.
+    """
     escaped = html.escape(text).replace("\u00a0", "&nbsp;")
+    pad = "" if len(text) > 24 else "&nbsp;"
     return (f'<font name="JBMono" size="7.6" backColor="#EFF2F5" '
-            f'color="#1F2328">&nbsp;{escaped}&nbsp;</font>')
+            f'color="#1F2328">{pad}{escaped}{pad}</font>')
 
 
 def md_inline(text: str) -> str:
@@ -237,7 +243,9 @@ def md_to_rl(text: str) -> str:
     text = md_inline(text)
     text = html.escape(text, quote=False)
     text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
-    text = re.sub(r"(?<![\w*])\*([^*\n]+?)\*(?![\w*])", r"<i>\1</i>", text)
+    # italique : on tolère le retour à la ligne (les paragraphes Markdown sont
+    # repliés sur plusieurs lignes), sinon les astérisques restent visibles.
+    text = re.sub(r"(?<![\w*])\*([^*]+?)\*(?![\w*])", r"<i>\1</i>", text, flags=re.S)
     text = re.sub(r"~~(.+?)~~", r"<strike>\1</strike>", text)
 
     def restore(m):
@@ -267,10 +275,12 @@ def md_to_rl(text: str) -> str:  # noqa: F811  (seconde définition volontaire)
 
     def link(m):
         label, url = m.group(1), m.group(2)
-        if url.startswith("#"):
-            return md_to_rl(label)
-        if not url.startswith("http"):
-            return md_to_rl(label)            # lien interne : texte seul
+        # Lien interne (ancre ou autre fichier du dossier) : on ne garde que le
+        # libellé, mais il doit rester OPAQUE (jeton) — sinon les pastilles
+        # `code` qu'il contient sont ré-échappées à l'étape 3 et le PDF affiche
+        # le balisage ReportLab en clair.
+        if url.startswith("#") or not url.startswith("http"):
+            return keep(md_to_rl(label))
         short = url.replace("https://", "").replace("http://", "")
         if len(short) > 54:
             short = short[:51] + "…"
@@ -284,7 +294,9 @@ def md_to_rl(text: str) -> str:  # noqa: F811  (seconde définition volontaire)
     # 2. gras / italique / barré sur l'ensemble (les jetons sont des \x00n\x00)
     #    un ** peut être coupé par un saut de paragraphe : on tolère les \n
     text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text, flags=re.S)
-    text = re.sub(r"(?<![\w*])\*([^*\n]+?)\*(?![\w*])", r"<i>\1</i>", text)
+    # italique : on tolère le retour à la ligne (les paragraphes Markdown sont
+    # repliés sur plusieurs lignes), sinon les astérisques restent visibles.
+    text = re.sub(r"(?<![\w*])\*([^*]+?)\*(?![\w*])", r"<i>\1</i>", text, flags=re.S)
     text = re.sub(r"__(.+?)__", r"<b>\1</b>", text, flags=re.S)
     text = re.sub(r"~~(.+?)~~", r"<strike>\1</strike>", text, flags=re.S)
 
@@ -618,18 +630,24 @@ def column_widths(rows: list[list[str]], ncols: int) -> list[float]:
     (jetons monospace compris) en prélevant le déficit sur les colonnes qui ont
     du mou. Deux passes suffisent en pratique.
     """
-    pad = 9.0
+    pad = 11.0  # 2 x 5 pt de padding + marge de sécurité (cf. make_table)
     mins, weights = [], []
     for c in range(ncols):
         cells = [re.sub(r"[`*]", "", r[c]) for r in rows]
         longest = 0.0
         for cell in cells:
             for token in cell.split():
-                w = pdfmetrics.stringWidth(token, "Inter", 7.6)
+                # Le pire des deux cas : corps (Inter 7.6) et en-tête (SemiBold 7.4),
+                # sinon « Authentification » déborde de sa cellule.
+                w = max(pdfmetrics.stringWidth(token, "Inter", 7.6),
+                        pdfmetrics.stringWidth(token, "Inter-SemiBold", 7.4))
                 if re.search(r"[_/.]|^[A-Z0-9_-]{4,}$", token):
-                    w = max(w, pdfmetrics.stringWidth(token, "JBMono", 7.6))
+                    w = max(w, pdfmetrics.stringWidth(token, "JBMono", 7.9))
                 longest = max(longest, w)
-        mins.append(min(longest + pad, CONTENT_W * 0.46))
+        # Plancher = mot le plus long + padding, mais plafonné : reportlab coupe
+        # les jetons trop larges (chemins, identifiants) sur 2-3 lignes, inutile
+        # de réserver 165 pt à `schemas/recurrence-rule.schema.json`.
+        mins.append(min(longest + pad, CONTENT_W * 0.28))
         weights.append((sum(len(x) for x in cells) / max(1, len(cells))) + 10)
 
     total_min = sum(mins)
@@ -658,8 +676,17 @@ def column_widths(rows: list[list[str]], ncols: int) -> list[float]:
 
 
 def breakable(text: str) -> str:
-    """Autorise la coupure des jetons très longs (identifiants, chemins)."""
-    return re.sub(r"(\S{26})", lambda m: m.group(1) + "\u200b", text)
+    """Neutralise les artefacts de césure.
+
+    Historiquement, cette fonction insérait des espaces de largeur nulle (U+200B)
+    dans les jetons longs. JetBrains Mono ne possède pas ce glyphe : reportlab le
+    remplaçait par un caractère de largeur ≈ 0,6 em, ce qui ajoutait un blanc
+    parasite au milieu des identifiants (`packages/ recurrence`). Depuis que la
+    largeur plancher des colonnes est plafonnée et que `splitLongWords` (actif par
+    défaut) coupe les jetons trop larges, la césure manuelle n'est plus utile :
+    on conserve donc le texte tel quel.
+    """
+    return text
 
 
 def make_table(rows: list[list[str]], aligns: list[str] | None = None) -> Table:

@@ -81,7 +81,7 @@ se traduit par **une et une seule** condition de fin, choisie dans une liste fer
 
 Formellement : `until = addMonths(startDate, months)`, puis application du mode `ON_DATE`.
 La date de fin est **incluse**. Le nombre d'occurrences est donc
-`⌊(until − startDate) / (7 × interval)⌋ × |byWeekday| + |{jours de byWeekday dans la dernière semaine partielle}|`.
+`floor((until − startDate) / (7 × interval)) × |byWeekday| + |{jours de byWeekday dans la dernière semaine partielle}|`.
 
 **Exemple de référence de l'énoncé** — début lundi 16/11/2026 à 09:00, un jour par semaine,
 intervalle 1, `months = 3` :
@@ -634,7 +634,7 @@ FONCTION genererSerie(série, busy, maintenant):
     si premiereOccurrence(série) < maintenant + 2h   # R-08 / SER_016
         LEVER SER_016_LEAD_TIME
     dates ← datesCandidates(série, fin)              # R-01, R-02, ancrage semaine ISO
-    dates ← dates ∪ série.rdate
+    dates ← union(dates, série.rdate)                 # R-08
     dates ← dates \ série.exdate                     # R-08
     dates ← appliquerJoursFermés(dates, série)       # R-07 → SKIP | SHIFT_FORWARD | KEEP
     trier(dates)

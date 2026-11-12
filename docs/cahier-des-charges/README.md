@@ -38,7 +38,7 @@ Il poursuit trois objectifs :
 | 02 | [`02-personas-utilisateurs.md`](docs/02-personas-utilisateurs.md) | Personas, parcours utilisateurs, JTBD, matrice de droits | Produit, design |
 | 03 | [`03-exigences-fonctionnelles.md`](docs/03-exigences-fonctionnelles.md) | Catalogue d'exigences numérotées, priorités MoSCoW, critères d'acceptation, hors-périmètre | Produit, QA |
 | 04 | [`04-securite-conformite.md`](docs/04-securite-conformite.md) | Sécurité, RGPD / Loi 25 / HIPAA, modèle de menaces, PSSI, gouvernance des données | RSSI, juridique |
-| 05 | [`05-architecture-technique.md`](docs/05-architecture-technique.md) | Architecture, modèle de domaine, API REST, événements, performance, exploitation | Architecture, dev |
+| 05 | [`05-architecture-technique.md`](docs/05-architecture-technique.md) | Architecture, modèle de domaine, API REST, événements, performance, exploitation, **§11 stack arrêtée**, §12 ADR | Architecture, dev |
 | 06 | [`06-moteur-rdv-recurrents.md`](docs/06-moteur-rdv-recurrents.md) | **Moteur de récurrence : règles R-01 à R-24, algorithmes, cas limites, garde-fous** | Architecture, dev, QA |
 | 07 | [`07-api-et-schemas-rdv-recurrents.md`](docs/07-api-et-schemas-rdv-recurrents.md) | Contrats d'API, machines à états, schémas JSON, catalogue d'erreurs | Dev, intégrateurs |
 | 08 | [`08-exigences-non-fonctionnelles.md`](docs/08-exigences-non-fonctionnelles.md) | SLO, performance, capacité, accessibilité, i18n, observabilité | Architecture, ops |
