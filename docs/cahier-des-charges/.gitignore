@@ -1,0 +1,3 @@
+# PDF build inputs/outputs (regenerate with tools/fetch_fonts.py)
+.fonts/
+__pycache__/
