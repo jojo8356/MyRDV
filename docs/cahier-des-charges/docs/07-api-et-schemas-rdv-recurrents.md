@@ -1,6 +1,6 @@
 # 07 — API et schémas des rendez-vous récurrents
 
-**Document** : 07 / 10 · **Version** 1.0 · **Date** : 12 novembre 2026 · **Statut** : contrat
+**Document** : 07 / 11 · **Version** 1.0 · **Date** : 12 novembre 2026 · **Statut** : contrat
 **Base d'URL** : `https://api.myrdv.app/v1` · **Format** : JSON (UTF-8), dates ISO-8601
 **Authentification** : OAuth 2.0 (authorization code + PKCE) ou clé d'API d'organisation
 **Normativité** : les règles de comportement renvoient au [document 06](06-moteur-rdv-recurrents.md)
@@ -568,4 +568,6 @@ différent renvoie `409 IDEM_409_KEY_REUSE`.
 
 ---
 
-*Suite : [`04-securite-conformite.md`](04-securite-conformite.md) — sécurité, conformité, données.*
+*Contrat exécutable : [`api/openapi.yaml`](../api/openapi.yaml) · documentation GUI :
+[`api/index.html`](../api/index.html) · règles transverses et conformité :
+[`11-api-regles-et-conformite.md`](11-api-regles-et-conformite.md).*

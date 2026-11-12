@@ -1,6 +1,6 @@
 # 10 — Roadmap, budget, organisation et risques
 
-**Document** : 10 / 10 · **Version** 1.0 · **Date** : 12 novembre 2026
+**Document** : 10 / 11 · **Version** 1.0 · **Date** : 12 novembre 2026
 **Horizon** : 4 trimestres (T1 2027 → T4 2027) · **Objectif** : mise en service commerciale (GA) en
 semaine 22 (≈ mai 2027), puis deux montées de version.
 

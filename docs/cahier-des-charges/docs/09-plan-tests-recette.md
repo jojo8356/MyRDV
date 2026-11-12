@@ -1,6 +1,6 @@
 # 09 — Plan de tests et de recette
 
-**Document** : 09 / 10 · **Version** 1.0 · **Date** : 12 novembre 2026
+**Document** : 09 / 11 · **Version** 1.0 · **Date** : 12 novembre 2026
 **Objectif** : démontrer que le produit satisfait les documents 03, 04, 06 et 08, avec un niveau de
 preuve proportionné au risque (données de santé, facturation, temps).
 

@@ -1,6 +1,6 @@
 # 00 — Synthèse exécutive
 
-**Document** : 00 / 10 · **Version** 1.0 · **Date** : 12 novembre 2026 · **Statut** : pour décision
+**Document** : 00 / 11 · **Version** 1.0 · **Date** : 12 novembre 2026 · **Statut** : pour décision
 **Auteur** : Direction produit MyRDV · **Diffusion** : comité exécutif, comité d'architecture, conseil
 
 ---
@@ -90,6 +90,8 @@ MyRDV reprend cette promesse en l'étendant sur trois axes que la concurrence tr
 - **08** : SLO, capacité, accessibilité (RGAA/WCAG 2.1 AA), internationalisation, observabilité.
 - **09** : stratégie de tests (pyramide, propriétés, charge, chaos, recette utilisateur).
 - **10** : roadmap sur 4 trimestres, budget détaillé, registre des risques et gouvernance.
+- **11** : règles d'API opposables (43 règles), droits des personnes exposés par l'API,
+  OWASP API Top 10, RGPD / Loi 25 / ISO 27001 — contrat OpenAPI et Swagger UI exécutables.
 
 ## 7. Décisions attendues à l'issue de la revue
 
@@ -98,6 +100,8 @@ MyRDV reprend cette promesse en l'étendant sur trois axes que la concurrence tr
 3. Validation de l'enveloppe budgétaire de 612 k€ et du calendrier de 22 semaines (doc 10).
 4. Désignation des propriétaires : produit (PM), architecture (lead), sécurité (RSSI), conformité (DPO).
 5. Autorisation de lancer les lots 0 (socle) et 1 (agenda + récurrence) en parallèle.
+6. Validation des **règles d'API opposables** `API-01` → `API-43` (doc 11) et du contrat
+   OpenAPI 3.1 associé — socle des revues sécurité et conformité des clients entreprise.
 
 ---
 

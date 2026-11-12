@@ -1,6 +1,6 @@
 # 08 — Exigences non fonctionnelles
 
-**Document** : 08 / 10 · **Version** 1.0 · **Date** : 12 novembre 2026
+**Document** : 08 / 11 · **Version** 1.0 · **Date** : 12 novembre 2026
 **Convention** : `NFR-<domaine>-<n>`. Chaque exigence est mesurable et rattachée à un moyen de
 vérification (test, sonde, revue).
 
@@ -118,7 +118,7 @@ Voir [document 04](04-securite-conformite.md). Exigences mesurables :
 | NFR-OBS-07 | Synthétique : parcours de réservation testé toutes les 5 min depuis 3 régions |
 | NFR-OBS-08 | Métrique dédiée `series_generation_discrepancy_total` comparant simulateur et production (R-17) |
 
-**Sondes de santé** : `/health/live`, `/health/ready`, `/health/deep` (base, Redis, NATS, Stripe).
+**Sondes de santé** : `/health/live`, `/health/ready`, `/health/deep` (base, Redis, files BullMQ, Stripe).
 
 ---
 
