@@ -1,6 +1,6 @@
 # 06 — Moteur de rendez-vous récurrents (spécification normative)
 
-**Document** : 06 / 10 · **Version** 1.0 · **Date** : 12 novembre 2026 · **Statut** : normatif
+**Document** : 06 / 11 · **Version** 1.0 · **Date** : 12 novembre 2026 · **Statut** : normatif
 **Portée** : règles de récurrence hebdomadaire, bornes de répétition, exceptions, conflits, ressources,
 matérialisation, notifications, facturation, interopérabilité.
 **Implémentation de référence** : [`tools/recurrence_simulator.py`](../tools/recurrence_simulator.py)

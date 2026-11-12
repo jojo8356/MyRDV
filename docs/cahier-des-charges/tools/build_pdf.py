@@ -1111,6 +1111,7 @@ DOCS = [
     ("08", "08-exigences-non-fonctionnelles.md", "Exigences non fonctionnelles"),
     ("09", "09-plan-tests-recette.md", "Plan de tests et recette"),
     ("10", "10-roadmap-budget-risques.md", "Roadmap, budget et risques"),
+    ("11", "11-api-regles-et-conformite.md", "Règles d'API et conformité"),
 ]
 
 
@@ -1187,7 +1188,7 @@ def build_main(out_dir: Path) -> Path:
         ["**Produit** : MyRDV · **Référence** : GOrendezvous",
          "**Date** : 12 novembre 2026 · **Statut** : baseline soumise à revue",
          "**Diffusion** : comité exécutif, architecture, sécurité, juridique"],
-        [("11", "documents"), ("195", "exigences fonctionnelles"),
+        [("12", "documents"), ("195", "exigences fonctionnelles"),
          ("24", "règles de récurrence"), ("87", "exigences non fonctionnelles")],
         sections,
     )

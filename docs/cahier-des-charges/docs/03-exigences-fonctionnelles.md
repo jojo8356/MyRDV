@@ -1,6 +1,6 @@
 # 03 — Exigences fonctionnelles
 
-**Document** : 03 / 10 · **Version** 1.0 · **Date** : 12 novembre 2026
+**Document** : 03 / 11 · **Version** 1.0 · **Date** : 12 novembre 2026
 **Périmètre** : 195 exigences, 27 domaines · **Priorités** : MUST / SHOULD / COULD / WON'T
 **Convention** : identifiant stable `F-<domaine>-<n>`, jamais renuméroté après publication.
 

@@ -1,6 +1,6 @@
 # 08 — Exigences non fonctionnelles
 
-**Document** : 08 / 10 · **Version** 1.0 · **Date** : 12 novembre 2026
+**Document** : 08 / 11 · **Version** 1.0 · **Date** : 12 novembre 2026
 **Convention** : `NFR-<domaine>-<n>`. Chaque exigence est mesurable et rattachée à un moyen de
 vérification (test, sonde, revue).
 

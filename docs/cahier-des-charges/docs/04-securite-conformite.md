@@ -1,6 +1,6 @@
 # 04 — Sécurité, protection des données et conformité
 
-**Document** : 04 / 10 · **Version** 1.0 · **Date** : 12 novembre 2026
+**Document** : 04 / 11 · **Version** 1.0 · **Date** : 12 novembre 2026
 **Référentiels** : RGPD (UE 2016/679) · Loi 25 (Québec) · PIPEDA/LPRPDÉ (Canada) · PHIPA (Ontario) ·
 HIPAA (US, sur option) · ISO/IEC 27001:2022 (annexe A) · OWASP ASVS 4.0 niveau 2 · NIST SP 800-63B
 **Propriétaires** : RSSI (sécurité), DPO (conformité), CTO (technique)
@@ -126,6 +126,10 @@ Entreprise, après signature d'un avenant et sélection d'une région d'héberge
 - Limitation de débit par organisation, par utilisateur et par IP ; protection anti-rejeu.
 - Validation stricte des schémas (les champs inconnus sont refusés).
 - Réponses d'erreur sans fuite d'information interne (pas de stack trace, pas de nom de table).
+- **Règles détaillées et opposables** : [`11-api-regles-et-conformite.md`](11-api-regles-et-conformite.md)
+  — règles `API-01` à `API-43`, application d'OWASP API Top 10, droits des personnes exposés par
+  l'API, journalisation sans donnée personnelle, webhooks conformes. Contrat exécutable :
+  [`api/openapi.yaml`](../api/openapi.yaml), documentation GUI : [`api/index.html`](../api/index.html).
 
 ### 4.4 Modèle de menaces (STRIDE)
 
@@ -285,6 +289,8 @@ Le module de récurrence introduit des risques propres :
 | ISO 27001 | Visé V2 (S1 2028) | Feuille de route |
 | HDS (France) | Option Entreprise via partenaire | Contrat partenaire |
 | WCAG 2.1 AA | Visé V1 sur parcours critiques | Audit doc 09 |
+| Règles d'API (API-01 → API-43) | Conforme au contrat | `api/tools/validate_contract.py` — 14 contrôles |
+| Droits des personnes par l'API (art. 15-22) | Conforme | Endpoints dédiés + tests T-CMP-010/011 |
 
 ---
 

@@ -44,6 +44,7 @@ Il poursuit trois objectifs :
 | 08 | [`08-exigences-non-fonctionnelles.md`](docs/08-exigences-non-fonctionnelles.md) | SLO, performance, capacité, accessibilité, i18n, observabilité | Architecture, ops |
 | 09 | [`09-plan-tests-recette.md`](docs/09-plan-tests-recette.md) | Stratégie de tests, plan de recette, critères de sortie | QA, direction |
 | 10 | [`10-roadmap-budget-risques.md`](docs/10-roadmap-budget-risques.md) | Roadmap, estimations, budget, registre des risques | Direction |
+| 11 | [`11-api-regles-et-conformite.md`](docs/11-api-regles-et-conformite.md) | **Règles d'API opposables API-01 → API-43**, droits des personnes par l'API, OWASP API Top 10, référentiels RGPD / Loi 25 / ISO 27001, journalisation, webhooks conformes | RSSI, DPO, dev, intégrateurs |
 
 ### Annexes et artefacts exécutables
 
@@ -55,9 +56,13 @@ Il poursuit trois objectifs :
 | [`tools/recurrence_simulator.py`](tools/recurrence_simulator.py) | **Spécification exécutable** du moteur de récurrence (Python 3.9+, sans dépendance) |
 | [`schemas/recurrence-rule.schema.json`](schemas/recurrence-rule.schema.json) | Schéma JSON (Draft 2020-12) de validation d'une règle de récurrence |
 | [`tools/test_schemas.py`](tools/test_schemas.py) | 17 cas de validation du schéma JSON |
+| [`api/openapi.yaml`](api/openapi.yaml) | **Contrat OpenAPI 3.1** de l'API `/v1` (source de vérité, vérifiée en CI) |
+| [`api/index.html`](api/index.html) | **Documentation GUI Swagger UI 5.34** embarquée (hors ligne, sans CDN) |
+| [`api/serve.py`](api/serve.py) | Serveur local : Swagger UI + mock conforme du contrat (201/401/409/422/428/429) |
+| [`api/tools/validate_contract.py`](api/tools/validate_contract.py) | 14 contrôles de conformité du contrat (absence de donnée de santé, idempotence, pagination, en-têtes) |
 | [`tools/build_pdf.py`](tools/build_pdf.py) | Compilation du dossier en PDF (thème GitHub Light + startup) |
 | [`tools/fetch_fonts.py`](tools/fetch_fonts.py) | Récupération des polices Inter / JetBrains Mono |
-| `pdf/` (racine du dépôt) | PDF générés : dossier complet (100 p.) et extrait récurrence (33 p.) |
+| `pdf/` (racine du dépôt) | PDF générés : dossier complet (106 p.) et extrait récurrence (33 p.) |
 
 ## 3. Comment lire ce dossier
 

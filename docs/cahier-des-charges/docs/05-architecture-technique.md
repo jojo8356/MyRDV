@@ -1,6 +1,6 @@
 # 05 — Architecture technique
 
-**Document** : 05 / 10 · **Version** 1.0 · **Date** : 12 novembre 2026
+**Document** : 05 / 11 · **Version** 1.0 · **Date** : 12 novembre 2026
 **Objectif** : décrire l'architecture cible, le modèle de domaine, les choix technologiques et les
 règles d'ingénierie permettant de satisfaire les exigences des documents 03, 06 et 08.
 **Stack arrêtée** : voir §11 (décision du 12 novembre 2026, vérifiée en environnement de développement).

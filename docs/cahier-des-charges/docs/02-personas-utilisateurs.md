@@ -1,6 +1,6 @@
 # 02 — Personas, parcours et matrice de droits
 
-**Document** : 02 / 10 · **Version** 1.0 · **Date** : 12 novembre 2026
+**Document** : 02 / 11 · **Version** 1.0 · **Date** : 12 novembre 2026
 **Objectif** : ancrer les exigences dans des usages réels et fixer le modèle d'habilitation.
 
 ---

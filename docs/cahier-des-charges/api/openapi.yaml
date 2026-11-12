@@ -1,0 +1,1268 @@
+openapi: 3.1.0
+info:
+  title: MyRDV API
+  version: 1.0.0
+  summary: API de prise de rendez-vous et de séries récurrentes — contrat public /v1
+  description: |
+    Contrat normatif de l'API MyRDV `/v1`.
+
+    **Conformité** : RGPD (UE 2016/679), Loi 25 (Québec), PIPEDA, PHIPA/HIPAA (option),
+    ISO/IEC 27001:2022, OWASP ASVS 4.0 niveau 2, OWASP API Security Top 10 (2023),
+    PCI-DSS v4.0 (périmètre délégué à Stripe).
+    Les règles opposables sont numérotées `API-01` à `API-43` dans
+    `docs/11-api-regles-et-conformite.md`.
+
+    **Garanties de contrat**
+    - Aucun champ de données de santé (classe C4) n'est exposé : la conformité est vérifiée
+      automatiquement par `api/tools/validate_contract.py`.
+    - Idempotence obligatoire sur tous les mutants (`Idempotency-Key`).
+    - Concurrence optimiste (`ETag` / `If-Match`, `412`).
+    - Pagination par curseur sur toutes les collections.
+    - Erreurs au format RFC 9457 enrichi (`code`, `requestId` stables).
+    - Identifiants ULID uniquement (aucun identifiant séquentiel exposé).
+
+    **Versionnage** : `/v1` dans le chemin ; rupture → `/v2` avec 12 mois de support simultané.
+  contact:
+    name: MyRDV — équipe API
+    email: api@myrdv.app
+    url: https://docs.myrdv.app
+  license:
+    name: Usage contractuel MyRDV (API propriétaire)
+    identifier: LicenseRef-MyRDV-Proprietary
+servers:
+  - url: https://api.myrdv.app/v1
+    description: Production (UE par défaut)
+  - url: https://api.ca.myrdv.app/v1
+    description: Production — résidence de données Canada (Loi 25)
+  - url: https://sandbox.myrdv.app/v1
+    description: Bac à sable (données fictives, jetons de test)
+  - url: http://localhost:8787/v1
+    description: Mock local (api/serve.py) — aucune donnée réelle
+
+tags:
+  - name: Séries
+    description: Séries de rendez-vous récurrents (règles R-01 à R-24, doc 06)
+  - name: Occurrences
+    description: "Occurrences individuelles d'une série"
+  - name: Droits des personnes
+    description: Accès, rectification, effacement, portabilité, limitation (RGPD art. 15-22, Loi 25)
+  - name: Exports
+    description: Exports asynchrones signés et expirants (API-22)
+  - name: Webhooks
+    description: Abonnements et livraisons signées (API-37 à API-39)
+  - name: Audit
+    description: "Journal d'audit append-only (API-34)"
+  - name: Système
+    description: Santé, quotas, métadonnées de contrat
+
+security:
+  - oauth2: []
+  - apiKey: []
+
+paths:
+  /series:
+    get:
+      tags: [Séries]
+      operationId: listSeries
+      summary: Lister les séries
+      description: |
+        Collection paginée par curseur (`API-22`). Isolation stricte par organisation :
+        `organization_id` est dérivé du jeton, jamais d'un paramètre (`API-07`, `API-08`).
+      parameters:
+        - $ref: '#/components/parameters/PractitionerId'
+        - $ref: '#/components/parameters/ClientId'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/SeriesStatus' }
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Liste des séries
+          headers:
+            RateLimit-Remaining: { $ref: '#/components/headers/RateLimitRemaining' }
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SeriesPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      tags: [Séries]
+      operationId: createSeries
+      summary: Créer une série récurrente
+      description: |
+        Crée la règle et matérialise les occurrences dans l'horizon glissant (R-11).
+        Requiert le scope `series:write` et le rôle `PRACTITIONER` ou supérieur.
+        Toute création est journalisée dans le journal d'audit (`API-34`).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SeriesCreate' }
+            examples:
+              troisMois:
+                summary: 3 mois, une séance par semaine
+                value:
+                  practitionerId: 01JB7Q9F3K2W8M5V6X1Y4Z7A0B
+                  clientId: 01JB7QA1M4N6P8R2S5T9U3V7W1
+                  serviceId: 01JB7QB2X8Y4Z6A1B3C5D7E9F2
+                  rule:
+                    freq: WEEKLY
+                    interval: 1
+                    byWeekday: [1]
+                    startDate: '2026-11-16'
+                    startTime: '09:00'
+                    timezone: Europe/Paris
+                    durationMinutes: 60
+                    end: { mode: AFTER_DURATION, months: 3 }
+                    advanced: { conflictPolicy: SKIP, dateShiftPolicy: SHIFT_FORWARD }
+                  billing: { mode: PER_SESSION }
+      responses:
+        '201':
+          description: Série créée
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Idempotency-Replayed: { $ref: '#/components/headers/IdempotencyReplayed' }
+            RateLimit-Remaining: { $ref: '#/components/headers/RateLimitRemaining' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Series' }
+        '402': { $ref: '#/components/responses/PlanLimit' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /series/preview:
+    post:
+      tags: [Séries]
+      operationId: previewSeries
+      summary: Prévisualiser une série (dryRun)
+      x-mutating: false
+      description: |
+        Calcule les occurrences sans rien écrire (F-REC-05). Retourne aussi les
+        `skipped` / `skippedConflict` (R-14) : aucune perte silencieuse.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SeriesCreate' }
+      responses:
+        '200':
+          description: Prévisualisation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SeriesPreview' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /series/{seriesId}:
+    parameters:
+      - $ref: '#/components/parameters/SeriesId'
+    get:
+      tags: [Séries]
+      operationId: getSeries
+      summary: "Détail d'une série"
+      responses:
+        '200':
+          description: Série
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Series' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Séries]
+      operationId: updateSeries
+      summary: Modifier une série (portée explicite)
+      description: |
+        La portée est obligatoire : `THIS`, `THIS_AND_FOLLOWING` ou `ALL`.
+        `If-Match` requis (`API-19`) ; la réponse contient le `diff` (R-12).
+        Une portée `ALL` ne modifie jamais une occurrence passée.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SeriesUpdate' }
+      responses:
+        '200':
+          description: Série modifiée avec diff
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SeriesUpdateResult' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Séries]
+      operationId: deleteSeries
+      summary: Annuler une série
+      description: |
+        Exige `confirmCount` égal au nombre d'occurrences planifiées (`428` sinon, `API-24`
+        et R-22) pour éviter l'annulation accidentelle d'une longue série.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: scope
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/Scope' }
+        - name: confirmCount
+          in: query
+          required: true
+          schema: { type: integer, minimum: 0, maximum: 520 }
+      responses:
+        '204': { description: Série annulée }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /series/{seriesId}/occurrences:
+    parameters:
+      - $ref: '#/components/parameters/SeriesId'
+    get:
+      tags: [Occurrences]
+      operationId: listOccurrences
+      summary: "Lister les occurrences d'une série"
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Occurrences paginées
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OccurrencePage' }
+
+  /series/{seriesId}/export.ics:
+    parameters:
+      - $ref: '#/components/parameters/SeriesId'
+    get:
+      tags: [Séries]
+      operationId: exportSeriesIcs
+      summary: Exporter la série au format iCalendar (RRULE)
+      responses:
+        '200':
+          description: Fichier ICS (R-24)
+          content:
+            text/calendar:
+              schema: { type: string }
+
+  /occurrences/{occurrenceKey}:
+    parameters:
+      - $ref: '#/components/parameters/OccurrenceKey'
+    patch:
+      tags: [Occurrences]
+      operationId: detachOccurrence
+      summary: Détacher et modifier une occurrence
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OccurrencePatch' }
+      responses:
+        '200':
+          description: Occurrence détachée
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Occurrence' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Occurrences]
+      operationId: removeOccurrence
+      summary: Retirer une occurrence (exdate)
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204': { description: Occurrence retirée }
+
+  /clients/{clientId}:
+    parameters:
+      - $ref: '#/components/parameters/ClientIdPath'
+    get:
+      tags: [Droits des personnes]
+      operationId: getClient
+      summary: Fiche client et consentements
+      responses:
+        '200':
+          description: Fiche client (classe C3)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Client' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Droits des personnes]
+      operationId: updateClient
+      summary: Rectifier une fiche (droit de rectification, art. 16)
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientPatch' }
+      responses:
+        '200':
+          description: Fiche corrigée
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Client' }
+    delete:
+      tags: [Droits des personnes]
+      operationId: eraseClient
+      summary: "Effacer une fiche (droit à l'effacement, art. 17)"
+      description: |
+        Supprime les données C3 et **pseudonymise** les données C2 (factures, 10 ans).
+        Réponse `209`-like documentée : `200` avec `partial: true` et la liste des
+        obligations légales de conservation qui subsistent (`API-14`, T-CMP-011).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: mode
+          in: query
+          required: true
+          schema: { type: string, enum: [erase] }
+      responses:
+        '200':
+          description: Effacement appliqué (résultat détaillé)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErasureResult' }
+
+  /clients/{clientId}/consents:
+    parameters:
+      - $ref: '#/components/parameters/ClientIdPath'
+    get:
+      tags: [Droits des personnes]
+      operationId: listConsents
+      summary: Consentements horodatés (preuve)
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Liste des consentements
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Consent' }
+    patch:
+      tags: [Droits des personnes]
+      operationId: patchConsents
+      summary: "Retirer un consentement / s'opposer (art. 7.3 et 21)"
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConsentPatch' }
+      responses:
+        '200':
+          description: "Consentements mis à jour (effet en moins de 60 s sur tous les canaux)"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsentPage' }
+
+  /processing-restrictions/{clientId}:
+    parameters:
+      - $ref: '#/components/parameters/ClientIdPath'
+    put:
+      tags: [Droits des personnes]
+      operationId: restrictProcessing
+      summary: Limiter le traitement (art. 18)
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      description: |
+        Une fois la limitation posée, toute création ou modification de rendez-vous
+        pour ce client renvoie `423 CMP_423_RESTRICTED`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProcessingRestriction' }
+      responses:
+        '200':
+          description: Limitation active
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProcessingRestriction' }
+
+  /exports:
+    post:
+      tags: [Exports]
+      operationId: createExport
+      summary: Demander un export (portabilité, art. 20)
+      description: |
+        Export asynchrone, complet et structuré ; archive `.zip` signée, lien expirant
+        en 15 minutes. Toute création d'export est journalisée (`API-34`).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExportRequest' }
+      responses:
+        '202':
+          description: Export en cours
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExportJob' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /exports/{exportId}:
+    parameters:
+      - name: exportId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/Ulid' }
+    get:
+      tags: [Exports]
+      operationId: getExport
+      summary: "État d'un export et lien de téléchargement"
+      responses:
+        '200':
+          description: "État de l'export"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExportJob' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /webhooks:
+    get:
+      tags: [Webhooks]
+      operationId: listWebhooks
+      summary: Lister les abonnements
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Abonnements
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WebhookEndpoint' }
+    post:
+      tags: [Webhooks]
+      operationId: createWebhook
+      summary: Enregistrer un point de terminaison
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      description: |
+        URL en HTTPS obligatoire, résolution DNS contrôlée, plages privées et
+        métadonnées de cloud refusées (anti-SSRF, `API-37`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebhookCreate' }
+      responses:
+        '201':
+          description: "Abonnement créé (secret affiché une seule fois)"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookEndpoint' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /audit:
+    get:
+      tags: [Audit]
+      operationId: listAudit
+      summary: "Journal d'audit (rôles OWNER/ADMIN)"
+      parameters:
+        - name: actorId
+          in: query
+          schema: { $ref: '#/components/schemas/Ulid' }
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: "Entrées d'audit (append-only, chaînées par hachage)"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /privacy/deindexation:
+    post:
+      tags: [Droits des personnes]
+      operationId: requestDeindexation
+      summary: Demander la désindexation publique (Loi 25, art. 28.1)
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [clientId, reason]
+              properties:
+                clientId: { $ref: '#/components/schemas/Ulid' }
+                reason:
+                  type: string
+                  maxLength: 500
+                  description: Motif déclaré (sans donnée de santé — API-01)
+      responses:
+        '202':
+          description: Demande enregistrée (traitement cible < 72 h)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivacyRequest' }
+
+  /privacy/retention-report:
+    get:
+      tags: [Droits des personnes]
+      operationId: retentionReport
+      summary: Attestation de purge et de rétention
+      responses:
+        '200':
+          description: Rapport de rétention par catégorie
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  generatedAt: { type: string, format: date-time }
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        category: { type: string }
+                        retention: { type: string }
+                        lastPurgeAt: { type: string, format: date-time }
+                        purgedCount: { type: integer, minimum: 0 }
+
+  /health/deep:
+    get:
+      tags: [Système]
+      operationId: healthDeep
+      summary: Sonde de profondeur (base, Redis, files BullMQ, Stripe)
+      security: []
+      responses:
+        '200':
+          description: Tous les composants disponibles
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503':
+          description: Composant indisponible (dégradation explicite, API-24)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: |
+        OAuth 2.0 authorization code + PKCE (S256) — `API-03`.
+        Jeton d'accès JWT RS256, durée ≤ 15 min, refresh rotatif à usage unique.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.myrdv.app/oauth2/authorize
+          tokenUrl: https://auth.myrdv.app/oauth2/token
+          refreshUrl: https://auth.myrdv.app/oauth2/token
+          scopes:
+            'series:read': Lire les séries et leurs occurrences
+            'series:write': Créer et modifier des séries
+            'series:delete': Annuler une série
+            'series:regenerate': Régénérer à horizon
+            'appointment:read': Lire les rendez-vous
+            'appointment:write': Modifier un rendez-vous
+            'appointment:delete': Supprimer un rendez-vous
+            'client:read': Lire les fiches clients (C3)
+            'client:write': Modifier les fiches clients
+            'client:erase': Exercer l'effacement
+            'invoice:read': Lire les factures
+            'invoice:write': Émettre une facture
+            'report:read': Accéder aux rapports
+            'audit:read': Lire le journal d'audit
+            'export:create': Demander un export
+            'webhook:manage': Gérer les abonnements webhook
+            'privacy:manage': Traiter les demandes de droits
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        Clé d'organisation `mrdv_live_sk_…` hachée en Argon2id en base (`API-09`).
+        Rotation sans coupure (chevauchement 24 h). Réservée aux intégrations serveur-à-serveur.
+
+  parameters:
+    SeriesId:
+      name: seriesId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Ulid' }
+    ClientIdPath:
+      name: clientId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Ulid' }
+    OccurrenceKey:
+      name: occurrenceKey
+      in: path
+      required: true
+      description: "Clé d'occurrence stable `AAAA-MM-JJTHH:MM` (heure murale locale, R-06)"
+      schema: { type: string, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$' }
+    PractitionerId:
+      name: practitionerId
+      in: query
+      schema: { $ref: '#/components/schemas/Ulid' }
+    ClientId:
+      name: clientId
+      in: query
+      schema: { $ref: '#/components/schemas/Ulid' }
+    From:
+      name: from
+      in: query
+      description: Borne basse inclusive (RFC 3339 avec offset)
+      schema: { type: string, format: date-time }
+    To:
+      name: to
+      in: query
+      description: Borne haute inclusive
+      schema: { type: string, format: date-time }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+    Cursor:
+      name: cursor
+      in: query
+      description: Curseur opaque retourné par la page précédente
+      schema: { type: string, maxLength: 200 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: "UUID v4 — conservation 24 h, rejeu à l'identique (`API-18`)"
+      schema: { type: string, format: uuid }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: "ETag obtenu par lecture préalable (`API-19`)"
+      schema: { type: string }
+
+  headers:
+    XRequestId:
+      description: "Identifiant de corrélation de la requête (API-35)"
+      schema: { type: string }
+    RateLimitRemaining:
+      description: Requêtes restantes dans la fenêtre courante
+      schema: { type: integer }
+    RequestId:
+      description: Identifiant de corrélation, à citer au support
+      schema: { type: string }
+    ETag:
+      description: Version de la ressource pour la concurrence optimiste
+      schema: { type: string }
+    Location:
+      description: URI de la ressource créée
+      schema: { type: string, format: uri-reference }
+    IdempotencyReplayed:
+      description: '`true` si la réponse provient d''un rejeu d''idempotence'
+      schema: { type: boolean }
+
+  responses:
+    Unauthorized:
+      description: Jeton absent, expiré ou invalide
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Scope ou rôle insuffisant
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: "Ressource inexistante **ou appartenant à une autre organisation** (API-16)"
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: "Conflit (créneau occupé, clé d'idempotence réutilisée, verrou)"
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ValidationError:
+      description: "Corps ou paramètres invalides (schéma strict, `additionalProperties: false`)"
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionFailed:
+      description: "`If-Match` obsolète"
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionRequired:
+      description: "Confirmation explicite requise (`confirmCount`)"
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PlanLimit:
+      description: "Plafond de l'offre atteint"
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TooManyRequests:
+      description: "Débit dépassé (`Retry-After`)"
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Ulid:
+      type: string
+      pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      description: Identifiant ULID (26 caractères Crockford base32, triable par temps)
+
+    SeriesStatus:
+      type: string
+      enum: [PENDING_APPROVAL, ACTIVE, PAUSED, ENDED, EXHAUSTED, CANCELLED, REJECTED]
+
+    Scope:
+      type: string
+      enum: [THIS, THIS_AND_FOLLOWING, ALL]
+
+    Weekday:
+      type: integer
+      minimum: 1
+      maximum: 7
+      description: 1 = lundi … 7 = dimanche (ISO-8601)
+
+    LocalTime:
+      type: string
+      pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+      description: "Heure murale locale `HH:MM` (R-06)"
+
+    IanaTimezone:
+      type: string
+      maxLength: 64
+      pattern: '^[A-Za-z_]+/[A-Za-z0-9_+\-/]+$'
+      description: "Nom IANA obligatoire (`Europe/Paris`) — jamais d'abréviation"
+
+    RecurrenceRule:
+      type: object
+      additionalProperties: false
+      required: [freq, interval, byWeekday, startDate, startTime, timezone, durationMinutes, end]
+      properties:
+        freq: { type: string, enum: [WEEKLY] }
+        interval: { type: integer, minimum: 1, maximum: 8 }
+        byWeekday:
+          type: array
+          minItems: 1
+          maxItems: 5
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Weekday' }
+        startDate: { type: string, format: date }
+        startTime: { $ref: '#/components/schemas/LocalTime' }
+        timezone: { $ref: '#/components/schemas/IanaTimezone' }
+        durationMinutes: { type: integer, minimum: 5, maximum: 480 }
+        end: { $ref: '#/components/schemas/EndCondition' }
+        advanced: { $ref: '#/components/schemas/AdvancedPolicy' }
+        rdate:
+          type: array
+          maxItems: 52
+          items: { type: string, format: date }
+          description: Dates ajoutées explicitement (R-08)
+        exdate:
+          type: array
+          maxItems: 52
+          items: { type: string, format: date }
+          description: Dates retirées explicitement (R-08)
+
+    EndCondition:
+      type: object
+      additionalProperties: false
+      description: "Un seul mode de fin (`SER_020_END_MODE_EXCLUSIVE`)"
+      oneOf:
+        - required: [mode, count]
+        - required: [mode, until]
+        - required: [mode, months]
+        - required: [mode, weeks]
+      properties:
+        mode: { type: string, enum: [AFTER_COUNT, ON_DATE, AFTER_DURATION, NEVER] }
+        count: { type: integer, minimum: 1, maximum: 520 }
+        until: { type: string, format: date }
+        months: { type: integer, minimum: 1, maximum: 36 }
+        weeks: { type: integer, minimum: 1, maximum: 156 }
+
+    AdvancedPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        conflictPolicy: { type: string, enum: [SKIP, FAIL, FORCE] }
+        dateShiftPolicy: { type: string, enum: [KEEP, SHIFT_FORWARD, SHIFT_BACKWARD] }
+        skipHolidays: { type: boolean }
+        notifyClient: { type: boolean }
+
+    Billing:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode: { type: string, enum: [PER_SESSION, PREPAID_PACKAGE, SUBSCRIPTION] }
+        packageTotalCents: { type: integer, minimum: 0 }
+        currency: { type: string, pattern: '^[A-Z]{3}$', description: ISO-4217 }
+
+    SeriesCreate:
+      type: object
+      additionalProperties: false
+      required: [practitionerId, clientId, serviceId, rule]
+      properties:
+        practitionerId: { $ref: '#/components/schemas/Ulid' }
+        clientId: { $ref: '#/components/schemas/Ulid' }
+        serviceId: { $ref: '#/components/schemas/Ulid' }
+        locationId: { $ref: '#/components/schemas/Ulid' }
+        resourceIds:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/Ulid' }
+        rule: { $ref: '#/components/schemas/RecurrenceRule' }
+        billing: { $ref: '#/components/schemas/Billing' }
+        notifyClient: { type: boolean, default: true }
+
+    SeriesUpdate:
+      type: object
+      additionalProperties: false
+      required: [scope]
+      properties:
+        scope: { $ref: '#/components/schemas/Scope' }
+        occurrenceKey:
+          type: string
+          pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$'
+          description: "Obligatoire si `scope = THIS`"
+        rule: { $ref: '#/components/schemas/RecurrenceRule' }
+        reason: { type: string, maxLength: 500 }
+
+    Series:
+      type: object
+      additionalProperties: false
+      required: [id, status, rule, progress, effectiveUntil, createdAt, etag]
+      properties:
+        id: { $ref: '#/components/schemas/Ulid' }
+        status: { $ref: '#/components/schemas/SeriesStatus' }
+        practitionerId: { $ref: '#/components/schemas/Ulid' }
+        clientId: { $ref: '#/components/schemas/Ulid' }
+        serviceId: { $ref: '#/components/schemas/Ulid' }
+        locationId: { $ref: '#/components/schemas/Ulid' }
+        resourceIds:
+          type: array
+          items: { $ref: '#/components/schemas/Ulid' }
+        rule: { $ref: '#/components/schemas/RecurrenceRule' }
+        effectiveUntil: { type: string, format: date }
+        materializedUntil: { type: string, format: date }
+        progress: { $ref: '#/components/schemas/Progress' }
+        skipped:
+          type: array
+          items: { type: string, format: date }
+        skippedConflict:
+          type: array
+          items: { type: string, format: date }
+        warnings:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              code: { type: string }
+              message: { type: string }
+        billing: { $ref: '#/components/schemas/Billing' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        etag: { type: string }
+        links:
+          type: object
+          additionalProperties: false
+          properties:
+            self: { type: string }
+            occurrences: { type: string }
+            ics: { type: string }
+
+    Progress:
+      type: object
+      additionalProperties: false
+      properties:
+        planned: { type: integer, minimum: 0 }
+        materialized: { type: integer, minimum: 0 }
+        completed: { type: integer, minimum: 0 }
+        cancelled: { type: integer, minimum: 0 }
+        skipped: { type: integer, minimum: 0 }
+
+    SeriesPreview:
+      type: object
+      additionalProperties: false
+      required: [requested, occurrences]
+      properties:
+        requested: { type: integer, minimum: 0 }
+        effectiveUntil: { type: string, format: date }
+        occurrences:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              date: { type: string, format: date }
+              startAt: { type: string, format: date-time }
+              endAt: { type: string, format: date-time }
+        skipped:
+          type: array
+          items: { type: string, format: date }
+        skippedConflict:
+          type: array
+          items: { type: string, format: date }
+        warnings:
+          type: array
+          items: { type: string }
+
+    SeriesUpdateResult:
+      type: object
+      additionalProperties: false
+      properties:
+        series: { $ref: '#/components/schemas/Series' }
+        diff:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              field: { type: string }
+              before: {}
+              after: {}
+        affectedCount: { type: integer, minimum: 0 }
+        seriesRevisionId: { $ref: '#/components/schemas/Ulid' }
+
+    Occurrence:
+      type: object
+      additionalProperties: false
+      required: [key, seriesId, status]
+      properties:
+        key:
+          type: string
+          pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$'
+        seriesId: { $ref: '#/components/schemas/Ulid' }
+        status: { type: string, enum: [PLANNED, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW, DETACHED] }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        detached: { type: boolean }
+
+    OccurrencePatch:
+      type: object
+      additionalProperties: false
+      properties:
+        startDate: { type: string, format: date }
+        startTime: { $ref: '#/components/schemas/LocalTime' }
+        durationMinutes: { type: integer, minimum: 5, maximum: 480 }
+        practitionerId: { $ref: '#/components/schemas/Ulid' }
+        reason: { type: string, maxLength: 500 }
+
+    Client:
+      type: object
+      additionalProperties: false
+      description: |
+        Fiche client — classe C3 (doc 04 §2). Champs strictement nécessaires à la
+        prise de rendez-vous ; **aucune donnée de santé** (`API-01`).
+      properties:
+        id: { $ref: '#/components/schemas/Ulid' }
+        displayName: { type: string, maxLength: 120 }
+        email: { type: string, format: email, maxLength: 254 }
+        phone: { type: string, maxLength: 32 }
+        locale: { type: string, pattern: '^[a-z]{2}(-[A-Z]{2})?$' }
+        consents:
+          type: array
+          items: { $ref: '#/components/schemas/Consent' }
+        processingRestricted: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        etag: { type: string }
+
+    ClientPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        displayName: { type: string, maxLength: 120 }
+        email: { type: string, format: email, maxLength: 254 }
+        phone: { type: string, maxLength: 32 }
+        locale: { type: string, pattern: '^[a-z]{2}(-[A-Z]{2})?$' }
+
+    Consent:
+      type: object
+      additionalProperties: false
+      required: [purpose, granted, version]
+      properties:
+        purpose:
+          type: string
+          enum: [APPOINTMENT_REMINDERS, MARKETING, ANALYTICS, AI_ASSISTANCE, DIRECTORY_PUBLICATION]
+        granted: { type: boolean }
+        version: { type: string, description: Version du texte de consentement présenté }
+        grantedAt: { type: string, format: date-time }
+        withdrawnAt: { type: string, format: date-time }
+
+    ConsentPatch:
+      type: object
+      additionalProperties: false
+      required: [purpose, granted]
+      properties:
+        purpose:
+          type: string
+          enum: [APPOINTMENT_REMINDERS, MARKETING, ANALYTICS, AI_ASSISTANCE, DIRECTORY_PUBLICATION]
+        granted: { type: boolean }
+        legalBasis: { type: string, maxLength: 200 }
+
+    ProcessingRestriction:
+      type: object
+      additionalProperties: false
+      required: [restricted]
+      properties:
+        restricted: { type: boolean }
+        reason: { type: string, maxLength: 500 }
+        requestedBy: { type: string, maxLength: 200 }
+        appliedAt: { type: string, format: date-time }
+
+    ErasureResult:
+      type: object
+      additionalProperties: false
+      properties:
+        clientId: { $ref: '#/components/schemas/Ulid' }
+        erased:
+          type: array
+          items: { type: string }
+          description: Catégories effacées
+        pseudonymized:
+          type: array
+          items:
+            type: string
+            description: Catégories conservées sous forme pseudonymisée
+        retainedForLegalObligation:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              category: { type: string }
+              legalBasis: { type: string }
+              until: { type: string, format: date }
+        partial: { type: boolean }
+        requestId: { type: string }
+
+    ExportRequest:
+      type: object
+      additionalProperties: false
+      required: [subject, format]
+      properties:
+        subject:
+          type: string
+          enum: [CLIENT, ORGANIZATION, SERIES]
+          description: Périmètre exporté (portabilité, art. 20)
+        subjectId: { $ref: '#/components/schemas/Ulid' }
+        format: { type: string, enum: [json, csv] }
+        includeAuditTrail: { type: boolean, default: true }
+
+    ExportJob:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/Ulid' }
+        status: { type: string, enum: [QUEUED, RUNNING, READY, EXPIRED, FAILED] }
+        format: { type: string, enum: [json, csv] }
+        downloadUrl:
+          type: string
+          format: uri
+          description: Lien signé, expirant 15 minutes après émission
+        expiresAt: { type: string, format: date-time }
+        checksumSha256: { type: string, maxLength: 64 }
+        createdAt: { type: string, format: date-time }
+
+    WebhookEndpoint:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/Ulid' }
+        url: { type: string, format: uri }
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+              - series.created
+              - series.updated
+              - series.ended
+              - series.exhausted
+              - series.partial
+              - occurrence.detached
+              - occurrence.cancelled
+              - occurrence.confirmed
+              - occurrence.completed
+              - privacy.request.received
+              - audit.security.alert
+        status: { type: string, enum: [ACTIVE, DISABLED] }
+        secretLastRotatedAt: { type: string, format: date-time }
+
+    WebhookCreate:
+      type: object
+      additionalProperties: false
+      required: [url, events]
+      properties:
+        url: { type: string, format: uri, pattern: '^https://' }
+        events:
+          type: array
+          minItems: 1
+          items: { type: string }
+
+    AuditEntry:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/Ulid' }
+        at: { type: string, format: date-time }
+        actorId: { $ref: '#/components/schemas/Ulid' }
+        action: { type: string }
+        subjectType: { type: string }
+        subjectId: { $ref: '#/components/schemas/Ulid' }
+        diff:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              field: { type: string }
+              before: {}
+              after: {}
+        previousHash: { type: string, maxLength: 64 }
+        hash: { type: string, maxLength: 64 }
+
+    PrivacyRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/Ulid' }
+        type: { type: string, enum: [ACCESS, RECTIFICATION, ERASURE, PORTABILITY, RESTRICTION, OBJECTION, DEINDEXATION] }
+        status: { type: string, enum: [RECEIVED, IN_PROGRESS, COMPLETED, REFUSED] }
+        receivedAt: { type: string, format: date-time }
+        dueAt:
+          type: string
+          format: date-time
+          description: Échéance légale (1 mois RGPD ; 10 jours pour la désindexation Loi 25)
+
+    Health:
+      type: object
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [ok, degraded, down] }
+        checks:
+          type: object
+          additionalProperties: false
+          properties:
+            database: { type: string, enum: [ok, degraded, down] }
+            redis: { type: string, enum: [ok, degraded, down] }
+            queue: { type: string, enum: [ok, degraded, down] }
+            payments: { type: string, enum: [ok, degraded, down] }
+        version: { type: string }
+
+    Problem:
+      type: object
+      additionalProperties: false
+      description: |
+        Erreur au format RFC 9457, enrichie des extensions MyRDV.
+        Aucune trace de pile, aucun nom de table, aucune donnée personnelle (`API-23`, `API-33`).
+      required: [type, title, status, code, requestId]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code:
+          type: string
+          description: Code stable et documenté (catalogue doc 07 §8)
+          examples: [SER_007_COUNT_OVER_CAP, IDEM_409_KEY_REUSE, RATE_429_LIMIT]
+        requestId: { type: string }
+        documentation: { type: string, format: uri }
+        errors:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              pointer: { type: string }
+              code: { type: string }
+              message: { type: string }
+
+    SeriesPage:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Series' }
+        nextCursor: { type: string, nullable: true }
+        hasMore: { type: boolean }
+
+    OccurrencePage:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Occurrence' }
+        nextCursor: { type: string, nullable: true }
+        hasMore: { type: boolean }
+
+    ConsentPage:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Consent' }
+        nextCursor: { type: string, nullable: true }
+        hasMore: { type: boolean }
+
+    WebhookPage:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/WebhookEndpoint' }
+        nextCursor: { type: string, nullable: true }
+        hasMore: { type: boolean }
+
+    AuditPage:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AuditEntry' }
+        nextCursor: { type: string, nullable: true }
+        hasMore: { type: boolean }

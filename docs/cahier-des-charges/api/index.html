@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MyRDV — Documentation API v1</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./vendor/swagger-ui/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./vendor/swagger-ui/favicon-16x16.png">
+  <link rel="stylesheet" href="./vendor/swagger-ui/index.css">
+  <style>
+    /* Palette GitHub Light + accent startup, cohérente avec le PDF du cahier des charges. */
+    :root {
+      --canvas: #ffffff;
+      --subtle: #f6f8fa;
+      --border: #d0d7de;
+      --fg: #1f2328;
+      --muted: #59636e;
+      --accent: #6b4eff;
+      --accent-dark: #4a2fd6;
+    }
+    html { box-sizing: border-box; overflow-y: scroll; }
+    *, *::before, *::after { box-sizing: inherit; }
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--fg);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .topbar { display: none; }           /* barre Swagger par défaut : remplacée ci-dessous */
+    header.banner {
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--subtle);
+      position: sticky; top: 0; z-index: 50;
+    }
+    header.banner .mark {
+      font-weight: 700; font-size: 16px; letter-spacing: -0.01em;
+      color: var(--accent-dark);
+    }
+    header.banner .sep { color: var(--border); }
+    header.banner .sub { color: var(--muted); font-size: 13px; }
+    header.banner .badge {
+      margin-left: auto; display: flex; gap: 8px; align-items: center;
+      font-size: 12px; color: var(--muted);
+    }
+    header.banner .badge code {
+      background: #efeaff; color: var(--accent-dark);
+      border: 1px solid #dcd2ff; border-radius: 6px;
+      padding: 2px 7px; font-size: 11.5px; font-weight: 600;
+    }
+    .notice {
+      margin: 18px 24px 0;
+      padding: 12px 16px;
+      border: 1px solid #dcd2ff;
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
+      background: #fbfaff;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #2b3440;
+    }
+    .notice strong { color: var(--accent-dark); }
+    .notice a { color: var(--accent-dark); }
+    #swagger-ui { max-width: 1240px; margin: 0 auto; padding: 8px 24px 64px; }
+    .swagger-ui .info .title { font-weight: 700; letter-spacing: -0.02em; }
+    .swagger-ui .scheme-container { background: transparent; box-shadow: none; padding: 8px 0 18px; }
+    .swagger-ui .btn.authorize { border-color: var(--accent); color: var(--accent-dark); }
+    .swagger-ui .btn.authorize svg { fill: var(--accent-dark); }
+    .swagger-ui .opblock-tag { font-size: 20px; letter-spacing: -0.01em; }
+    .swagger-ui .opblock.opblock-post { background: #f2fbf5; border-color: #a7e0bb; }
+    .swagger-ui .opblock.opblock-get { background: #f1f6ff; border-color: #b6cff5; }
+    .swagger-ui .opblock.opblock-patch { background: #fff9ec; border-color: #f0d9a8; }
+    .swagger-ui .opblock.opblock-delete { background: #fdf3f3; border-color: #f0bcbc; }
+    .swagger-ui .opblock.opblock-put { background: #fbf4ff; border-color: #ddc2f0; }
+    .swagger-ui .opblock-summary-method { font-weight: 700; }
+    .swagger-ui .markdown code, .swagger-ui .renderedMarkdown code {
+      background: #eff2f5; border-radius: 4px; padding: 1px 5px; font-size: 12px;
+    }
+    footer.legal {
+      border-top: 1px solid var(--border);
+      margin-top: 32px;
+      padding: 18px 24px 40px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+    footer.legal a { color: var(--accent-dark); }
+  </style>
+</head>
+<body>
+<header class="banner">
+  <span class="mark">MyRDV</span>
+  <span class="sep">/</span>
+  <span class="sub">Documentation API — contrat public <code>/v1</code></span>
+  <span class="badge">
+    <code>OpenAPI 3.1</code>
+    <span>·</span>
+    <span>RGPD · Loi 25 · ISO 27001 · ASVS L2</span>
+  </span>
+</header>
+
+<div class="notice">
+  <strong>Documentation hors ligne.</strong> Swagger UI&nbsp;5.34 est embarqué dans ce dossier
+  (<code>api/vendor/swagger-ui/</code>) : aucune requête ne part vers un CDN, aucun traceur, aucune
+  donnée ne quitte votre poste. L'essai des endpoints s'adresse au <em>mock</em> local
+  (<code>api/serve.py</code>) — jamais à la production. Les règles opposables sont numérotées
+  <code>API-01</code> à <code>API-43</code> dans
+  <a href="../docs/11-api-regles-et-conformite.md">le document 11</a> ; le contrat source est
+  <a href="./openapi.yaml">openapi.yaml</a>.
+</div>
+
+<div id="swagger-ui"></div>
+
+<footer class="legal">
+  Contrat normatif — les évolutions compatibles ne changent pas la version ; toute rupture ouvre
+  <code>/v2</code> avec 12 mois de support simultané. Vérifications automatiques :
+  <code>python3 api/tools/validate_contract.py</code>.
+</footer>
+
+<script src="./vendor/swagger-ui/swagger-ui-bundle.js"></script>
+<script src="./vendor/swagger-ui/swagger-ui-standalone-preset.js"></script>
+<script>
+  window.addEventListener('load', function () {
+    window.ui = SwaggerUIBundle({
+      url: './openapi.yaml',
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      docExpansion: 'list',
+      defaultModelsExpandDepth: 1,
+      defaultModelExpandDepth: 2,
+      displayRequestDuration: true,
+      displayOperationId: false,
+      filter: true,
+      // Le mock local est le serveur présélectionné : « Try it out » ne peut pas
+      // atteindre la production par inadvertance (API-43).
+      tryItOutEnabled: true,
+      // Aucun jeton conservé, aucun cookie envoyé (API-43).
+      persistAuthorization: false,
+      withCredentials: false,
+      validatorUrl: null,
+      supportedSubmitMethods: ['get', 'post', 'patch', 'put', 'delete'],
+      syntaxHighlight: { activate: true, theme: 'agate' },
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+      plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+      layout: 'BaseLayout',
+      requestInterceptor: function (req) {
+        // Le mock accepte n'importe quel jeton de démonstration ; on ne saisit
+        // jamais de secret réel dans une page de documentation.
+        req.headers['X-Doc-Page'] = 'swagger-ui-local';
+        return req;
+      }
+    });
+  });
+</script>
+</body>
+</html>
